@@ -9,13 +9,22 @@ description = "Data preparation pipeline for detecting AI-generated Chinese RedN
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
+    "accelerate",
+    "datasets",
+    "joblib",
+    "matplotlib",
     "numpy",
     "pandas",
     "pyyaml",
     "pytest",
     "scikit-learn",
+    "torch",
+    "transformers",
     "tqdm",
 ]
+
+[project.optional-dependencies]
+dev = ["pytest"]
 
 [tool.setuptools.packages.find]
 where = ["src"]
