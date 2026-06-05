@@ -1,1 +1,1 @@
-"""Evaluation placeholders for later experiments."""
+"""Evaluation metrics and report generation."""
