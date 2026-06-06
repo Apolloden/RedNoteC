@@ -222,7 +222,7 @@ def _train_transformer(
     allow_smoke_fallback: bool,
 ) -> dict[str, Any]:
     from datasets import Dataset
-    from transformers import Trainer, TrainingArguments
+    from transformers import Trainer, TrainingArguments, EarlyStoppingCallback
 
     from rednote_aigt.models.transformer import TransformerClassifier
 
@@ -347,7 +347,13 @@ def _train_transformer(
             eval_dataset=val_ds,
             processing_class=classifier.tokenizer,
             compute_metrics=compute_metrics,
-            callbacks=[ProgressLoggingCallback()],
+            callbacks=[
+                ProgressLoggingCallback(),
+                EarlyStoppingCallback(
+                    early_stopping_patience=int(config.get("early_stopping_patience", 2)),
+                    early_stopping_threshold=float(config.get("early_stopping_threshold", 0.0)),
+                ),
+            ],
         )
         stage_bar.set_postfix_str("train")
         LOGGER.info("Transformer: starting Trainer.train(); Hugging Face progress bars will show batch/step progress")
