@@ -1,54 +1,56 @@
 tfidf_logreg:
-  model_type: "tfidf"
-  text_column: "text"
-  label_column: "label"
+  model_type: tfidf
+  text_column: text
+  label_column: label
   vectorizer:
-    analyzer: "char"
-    ngram_range: [2, 5]
+    analyzer: char
+    ngram_range:
+    - 2
+    - 5
     min_df: 2
     max_df: 0.95
     sublinear_tf: true
     max_features: 300000
   classifier:
-    class_weight: "balanced"
+    class_weight: balanced
     max_iter: 2000
-    solver: "liblinear"
+    solver: liblinear
     random_state: 42
-
 transformer_roberta:
-  model_type: "transformer"
-  pretrained_model_name: "hfl/chinese-roberta-wwm-ext"
+  model_type: transformer
+  pretrained_model_name: hfl/chinese-roberta-wwm-ext
   use_safetensors: false
   disable_safetensors_conversion: true
-  text_column: "text"
-  label_column: "label"
-  device: "auto"
-  prefer_mps: true
-  prefer_cuda: false
+  text_column: text
+  label_column: label
+  device: cuda
+  prefer_mps: false
+  prefer_cuda: true
   fp16: false
-  bf16: false
-  no_cuda: true
-  dataloader_num_workers: 0
-  dataloader_pin_memory: false
+  bf16: true
+  no_cuda: false
+  dataloader_num_workers: 4
+  dataloader_pin_memory: true
   max_length: 256
-  batch_size: 4
-  gradient_accumulation_steps: 2
-  learning_rate: 2e-5
-  num_train_epochs: 1
+  batch_size: 64
+  gradient_accumulation_steps: 1
+  learning_rate: 2.0e-05
+  num_train_epochs: 5
   weight_decay: 0.01
   warmup_ratio: 0.06
   seed: 42
   logging_steps: 50
-  metric_for_best_model: "eval_macro_f1"
+  metric_for_best_model: eval_macro_f1
   greater_is_better: true
-
+  save_steps: 500
+  early_stopping_patience: 2
+  early_stopping_threshold: 0.0
 smoke_test:
   max_train_samples: 128
   max_eval_samples: 64
   transformer_max_steps: 3
   transformer_num_train_epochs: 1
   tfidf_max_features: 5000
-
 mac_mps_smoke:
   max_train_samples: 64
   max_eval_samples: 32
