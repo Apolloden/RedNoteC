@@ -1,0 +1,6 @@
+{
+  "requested_model": "hfl/chinese-roberta-wwm-ext",
+  "actual_model": "hfl/chinese-roberta-wwm-ext",
+  "fallback_used": false,
+  "error": null
+}
