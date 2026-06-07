@@ -1,0 +1,22 @@
+{
+  "raw_rows": 59132,
+  "cleaned_rows": 59132,
+  "deduped_rows": 58882,
+  "splits": {
+    "train": 41217,
+    "val": 8832,
+    "test": 8833
+  },
+  "audit_json": "outputs/reports/data_audit.json",
+  "audit_md": "outputs/reports/data_audit.md",
+  "cleaned_all": "data/interim/cleaned_all.csv",
+  "processed_dir": "data/processed",
+  "dedupe_report": {
+    "input_rows": 59132,
+    "conflict_text_values": 0,
+    "conflict_rows_removed": 0,
+    "within_label_duplicate_rows_removed": 250,
+    "output_rows": 58882,
+    "label_conflicts_path": "data/interim/label_conflicts.csv"
+  }
+}

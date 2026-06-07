@@ -1,0 +1,26 @@
+{
+  "model_type": "tfidf",
+  "text_column": "text",
+  "label_column": "label",
+  "vectorizer": {
+    "analyzer": "char",
+    "ngram_range": [
+      2,
+      5
+    ],
+    "min_df": 2,
+    "max_df": 0.95,
+    "sublinear_tf": true,
+    "max_features": 300000
+  },
+  "classifier": {
+    "class_weight": "balanced",
+    "max_iter": 2000,
+    "solver": "liblinear",
+    "random_state": 42
+  },
+  "seed": 42,
+  "device": "auto",
+  "prefer_mps": true,
+  "prefer_cuda": false
+}

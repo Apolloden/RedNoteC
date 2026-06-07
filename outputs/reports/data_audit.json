@@ -1,0 +1,222 @@
+{
+  "total_rows": 59132,
+  "load_reports": [
+    {
+      "path": "data/raw/training_set_human.jsonl",
+      "label": 0,
+      "rows_loaded": 51878,
+      "malformed_rows": 0,
+      "missing_required_rows": 0,
+      "aliases_used": {
+        "note_content": "desc",
+        "likes": "liked_count",
+        "collections": "collected_count",
+        "comments": "comments_count"
+      }
+    },
+    {
+      "path": "data/raw/training_set_aigc.jsonl",
+      "label": 1,
+      "rows_loaded": 7254,
+      "malformed_rows": 0,
+      "missing_required_rows": 0,
+      "aliases_used": {}
+    }
+  ],
+  "label_counts": {
+    "0": 51878,
+    "1": 7254
+  },
+  "domain_counts_by_label": {
+    "0": {
+      "健康": 9440,
+      "学习": 3744,
+      "宠物": 1686,
+      "心理": 4241,
+      "情感": 6825,
+      "旅行": 6195,
+      "穿搭": 5101,
+      "美食": 8006,
+      "职场": 5468,
+      "运动": 1172
+    },
+    "1": {
+      "健康": 1122,
+      "学习": 243,
+      "宠物": 169,
+      "心理": 764,
+      "情感": 1099,
+      "旅行": 837,
+      "穿搭": 1141,
+      "美食": 939,
+      "职场": 843,
+      "运动": 97
+    }
+  },
+  "model_family_counts_aigc": {
+    "gpt": 1730,
+    "deepseek": 1593,
+    "qwen": 1250,
+    "gemini": 1153,
+    "glm": 792,
+    "anthropic": 736
+  },
+  "model_counts_aigc": {
+    "deepseek-r1-250528": 653,
+    "deepseek-r1-250120": 556,
+    "gemini-1.5": 473,
+    "gemini-2.0": 462,
+    "gpt-o3": 449,
+    "gpt-4.1": 443,
+    "qwen2.5": 439,
+    "glm-3": 424,
+    "gpt-4o": 423,
+    "gpt-o4": 415,
+    "qwen2": 409,
+    "qwen3": 402,
+    "claude-sonnet-4": 385,
+    "deepseek-v3": 384,
+    "glm-4": 368,
+    "claude-3-7-sonnet": 351,
+    "gemini-2.5": 218
+  },
+  "missing_field_counts": {
+    "note_title": 0,
+    "note_content": 0,
+    "label": 0,
+    "source_file": 0,
+    "source_line": 0,
+    "note_id": 7254,
+    "local_time": 7254,
+    "likes": 7254,
+    "collections": 7254,
+    "comments": 7254,
+    "domain": 0,
+    "model_family": 51878,
+    "model": 51878,
+    "text": 0,
+    "title_only": 0,
+    "text_len_chars": 0,
+    "id": 0
+  },
+  "empty_counts": {
+    "note_title": 7411,
+    "note_content": 0,
+    "text": 0
+  },
+  "duplicate_text_counts": {
+    "duplicate_rows_overall": 490,
+    "duplicate_text_values_overall": 250,
+    "duplicate_rows_by_label": {
+      "0": 490
+    }
+  },
+  "human_aigc_exact_text_overlap": {
+    "overlap_text_values": 0,
+    "rows_in_overlap": 0
+  },
+  "length_stats_by_label": {
+    "0": {
+      "count": 51878,
+      "mean": 492.7464435791665,
+      "median": 425.0,
+      "min": 83,
+      "max": 5326
+    },
+    "1": {
+      "count": 7254,
+      "mean": 370.1743865453543,
+      "median": 341.0,
+      "min": 24,
+      "max": 1296
+    }
+  },
+  "length_stats_by_domain": {
+    "健康": {
+      "count": 10562,
+      "mean": 441.34406362431355,
+      "median": 379.0,
+      "min": 36,
+      "max": 1128
+    },
+    "学习": {
+      "count": 3987,
+      "mean": 499.09280160521695,
+      "median": 417.0,
+      "min": 116,
+      "max": 1103
+    },
+    "宠物": {
+      "count": 1855,
+      "mean": 424.3983827493261,
+      "median": 360.0,
+      "min": 137,
+      "max": 1071
+    },
+    "心理": {
+      "count": 5005,
+      "mean": 601.6331668331668,
+      "median": 564.0,
+      "min": 30,
+      "max": 1099
+    },
+    "情感": {
+      "count": 7924,
+      "mean": 475.58657243816253,
+      "median": 409.0,
+      "min": 24,
+      "max": 1118
+    },
+    "旅行": {
+      "count": 7032,
+      "mean": 560.1686575654153,
+      "median": 511.5,
+      "min": 62,
+      "max": 1267
+    },
+    "穿搭": {
+      "count": 6242,
+      "mean": 394.8067926946492,
+      "median": 349.0,
+      "min": 35,
+      "max": 1087
+    },
+    "美食": {
+      "count": 8945,
+      "mean": 425.2316377864729,
+      "median": 379.0,
+      "min": 151,
+      "max": 1177
+    },
+    "职场": {
+      "count": 6311,
+      "mean": 522.873871018856,
+      "median": 458.0,
+      "min": 41,
+      "max": 5326
+    },
+    "运动": {
+      "count": 1269,
+      "mean": 411.78959810874704,
+      "median": 357.0,
+      "min": 153,
+      "max": 1096
+    }
+  },
+  "suspicious_columns_not_for_model_features": [
+    "local_time",
+    "likes",
+    "collections",
+    "comments",
+    "domain",
+    "model_family",
+    "model"
+  ],
+  "cleaning_report": {
+    "input_rows": 59132,
+    "dropped_empty_text_rows": 0,
+    "dropped_short_title_only_rows": 0,
+    "kept_title_only_rows": 0,
+    "output_rows": 59132
+  }
+}
