@@ -1,0 +1,10 @@
+{
+  "torch_version": "2.11.0+cu128",
+  "platform_machine": "x86_64",
+  "platform": "Linux-6.6.122+-x86_64-with-glibc2.35",
+  "mps_built": false,
+  "mps_available": false,
+  "cuda_available": true,
+  "selected_device": "cpu",
+  "selected_for_evaluation": "cuda"
+}
