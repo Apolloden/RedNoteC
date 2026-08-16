@@ -1,7 +1,14 @@
-"""Matplotlib plots for model evaluation."""
+"""Matplotlib plots for model evaluation.
+
+Domain names are Chinese, so the module picks a CJK-capable font at import
+time; matplotlib's default (DejaVu Sans) has no CJK coverage and renders every
+domain label as an identical empty box, which silently makes the domain figure
+useless.
+"""
 
 from __future__ import annotations
 
+import logging
 import os
 from pathlib import Path
 
@@ -13,9 +20,47 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+from matplotlib import font_manager
 from sklearn.metrics import ConfusionMatrixDisplay, PrecisionRecallDisplay, RocCurveDisplay
 
 from rednote_aigt.utils.io import ensure_dir
+
+LOGGER = logging.getLogger(__name__)
+
+# Ordered by preference; the first one installed wins. Covers macOS, common
+# Linux CJK packages, and Windows.
+CJK_FONT_CANDIDATES = [
+    "PingFang SC",
+    "Hiragino Sans GB",
+    "Heiti SC",
+    "STHeiti",
+    "Songti SC",
+    "Noto Sans CJK SC",
+    "Noto Sans SC",
+    "Source Han Sans SC",
+    "Microsoft YaHei",
+    "SimHei",
+    "WenQuanYi Zen Hei",
+    "Arial Unicode MS",
+]
+
+
+def use_cjk_font() -> str | None:
+    """Make Chinese labels renderable; return the font used, or None if absent."""
+    installed = {font.name for font in font_manager.fontManager.ttflist}
+    for candidate in CJK_FONT_CANDIDATES:
+        if candidate in installed:
+            plt.rcParams["font.sans-serif"] = [candidate, *plt.rcParams["font.sans-serif"]]
+            plt.rcParams["axes.unicode_minus"] = False
+            return candidate
+    LOGGER.warning(
+        "No CJK font found (tried %s); Chinese labels in figures will render as boxes.",
+        ", ".join(CJK_FONT_CANDIDATES),
+    )
+    return None
+
+
+SELECTED_CJK_FONT = use_cjk_font()
 
 
 def plot_confusion_matrix(cm: list[list[int]], path: Path) -> None:
