@@ -1,25 +1,93 @@
-data/raw/*
-data/interim/*
-data/processed/*
-docs/*
-outputs/*
-models/*
-checkpoints/*
-*.parquet
-*.csv
-*.jsonl
+# ---------------------------------------------------------------------------
+# OS / editor cruft
+# ---------------------------------------------------------------------------
 .DS_Store
-__pycache__/
-.pytest_cache/
-*.egg-info/
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+Thumbs.db
+desktop.ini
+.idea/
+.vscode/
+*.swp
+*~
 
-!data/raw/.gitkeep
-!data/interim/.gitkeep
-!data/processed/.gitkeep
-!docs/.gitkeep
-!outputs/reports/
-!outputs/figures/
-outputs/reports/*
-outputs/figures/*
-!outputs/reports/.gitkeep
-!outputs/figures/.gitkeep
+# ---------------------------------------------------------------------------
+# AI / agent tooling — never commit local assistant instructions or caches
+# ---------------------------------------------------------------------------
+AGENTS.md
+CLAUDE.md
+CLAUDE.local.md
+GEMINI.md
+.claude/
+.cursor/
+.cursorrules
+.aider*
+.continue/
+.windsurfrules
+.github/copilot-instructions.md
+
+# ---------------------------------------------------------------------------
+# Python
+# ---------------------------------------------------------------------------
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.venv/
+venv/
+env/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.ipynb_checkpoints/
+.coverage
+htmlcov/
+
+# ---------------------------------------------------------------------------
+# Data — the RedNote-Vibe corpus is downloaded locally, never committed
+# ---------------------------------------------------------------------------
+data/**
+!data/raw/
+!data/interim/
+!data/processed/
+!data/**/.gitkeep
+
+*.jsonl
+*.parquet
+*.arrow
+*.feather
+
+# ---------------------------------------------------------------------------
+# Trained model artifacts and checkpoints (regenerate with scripts/train.py)
+# ---------------------------------------------------------------------------
+models/
+checkpoints/
+*.joblib
+*.pkl
+*.pt
+*.bin
+*.safetensors
+*.onnx
+
+# ---------------------------------------------------------------------------
+# Generated outputs
+#
+# Committed on purpose: metrics, subgroup tables, error samples, and figures —
+# they are the evidence behind the results table in the README.
+# Excluded: full prediction dumps (verbatim dataset text) and run logs.
+# ---------------------------------------------------------------------------
+outputs/**/predictions.csv
+outputs/**/*.log
+outputs/**/*smoke*
+MPLCONFIGDIR/
+
+# ---------------------------------------------------------------------------
+# Hugging Face / torch caches
+# ---------------------------------------------------------------------------
+.cache/
+wandb/
+runs/
