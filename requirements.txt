@@ -1,0 +1,15 @@
+# Runtime dependencies. Mirrors [project.dependencies] in pyproject.toml —
+# update both together. `pip install -e ".[dev]"` remains the primary local
+# install path; this file exists for CI's pinned, non-editable install.
+accelerate
+datasets
+joblib
+matplotlib
+numpy
+pandas
+pyyaml
+pytest
+scikit-learn
+torch
+transformers
+tqdm

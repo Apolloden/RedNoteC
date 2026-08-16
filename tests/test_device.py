@@ -1,4 +1,3 @@
-import argparse
 from pathlib import Path
 
 import torch
@@ -51,8 +50,9 @@ def test_training_arguments_builder_drops_unsupported_args(tmp_path):
         max_steps=3,
         selected_device="mps",
     )
-    from transformers import TrainingArguments
     import inspect
+
+    from transformers import TrainingArguments
 
     supported = inspect.signature(TrainingArguments.__init__).parameters
     assert set(kwargs).issubset(set(supported))

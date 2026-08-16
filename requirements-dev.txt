@@ -1,0 +1,2 @@
+# Lint/format tooling used only in CI and local dev, not at runtime.
+ruff
