@@ -1,4 +1,15 @@
-"""Metrics for binary AI-generated text detection."""
+"""Metrics for binary AI-generated text detection.
+
+Every metric here is computed over the fixed label set ``[0, 1]`` (0 = human,
+1 = AI). That matters for subgroup tables: a subgroup can legitimately contain
+only one class (the generator tables hold AI rows only), and scikit-learn's
+``average="macro"`` silently averages over the labels it *observes* unless the
+label set is pinned. Pinning it keeps a subgroup metric comparable to the same
+metric on the full split instead of quietly changing its definition.
+
+Score-based metrics (AUROC, AUPRC) are undefined with one class present and are
+returned as ``None`` rather than a misleading number.
+"""
 
 from __future__ import annotations
 
@@ -15,10 +26,11 @@ from sklearn.metrics import (
     f1_score,
     log_loss,
     precision_recall_fscore_support,
-    precision_score,
     recall_score,
     roc_auc_score,
 )
+
+LABELS = [0, 1]
 
 
 def compute_binary_metrics(
@@ -26,6 +38,7 @@ def compute_binary_metrics(
     score_ai: list[float] | np.ndarray,
     threshold: float = 0.5,
 ) -> dict[str, Any]:
+    """Score AI-probability predictions against binary labels at one threshold."""
     y_true_arr = np.asarray(y_true).astype(int)
     score_arr = np.asarray(score_ai).astype(float)
     y_pred = (score_arr >= threshold).astype(int)
@@ -33,10 +46,10 @@ def compute_binary_metrics(
     precision, recall, f1, support = precision_recall_fscore_support(
         y_true_arr,
         y_pred,
-        labels=[0, 1],
+        labels=LABELS,
         zero_division=0,
     )
-    cm = confusion_matrix(y_true_arr, y_pred, labels=[0, 1])
+    cm = confusion_matrix(y_true_arr, y_pred, labels=LABELS)
 
     metrics: dict[str, Any] = {
         "accuracy": float(accuracy_score(y_true_arr, y_pred)),
@@ -47,10 +60,12 @@ def compute_binary_metrics(
         "precision_ai": float(precision[1]),
         "recall_ai": float(recall[1]),
         "f1_ai": float(f1[1]),
-        "macro_precision": float(precision_score(y_true_arr, y_pred, average="macro", zero_division=0)),
-        "macro_recall": float(recall_score(y_true_arr, y_pred, average="macro", zero_division=0)),
-        "macro_f1": float(f1_score(y_true_arr, y_pred, average="macro", zero_division=0)),
-        "weighted_f1": float(f1_score(y_true_arr, y_pred, average="weighted", zero_division=0)),
+        # Macro averages are taken over the pinned per-class arrays above, so a
+        # single-class subgroup still averages human and AI instead of one class.
+        "macro_precision": float(np.mean(precision)),
+        "macro_recall": float(np.mean(recall)),
+        "macro_f1": float(np.mean(f1)),
+        "weighted_f1": float(f1_score(y_true_arr, y_pred, average="weighted", labels=LABELS, zero_division=0)),
         "log_loss": _safe_log_loss(y_true_arr, score_arr),
         "auroc": _safe_roc_auc(y_true_arr, score_arr),
         "average_precision": _safe_average_precision(y_true_arr, score_arr),
@@ -63,10 +78,11 @@ def compute_binary_metrics(
 
 
 def classification_report_dict(y_true: list[int] | np.ndarray, pred_label: list[int] | np.ndarray) -> dict[str, Any]:
+    """Return scikit-learn's per-class report as a JSON-serializable dict."""
     return classification_report(
         np.asarray(y_true).astype(int),
         np.asarray(pred_label).astype(int),
-        labels=[0, 1],
+        labels=LABELS,
         target_names=["human", "ai"],
         output_dict=True,
         zero_division=0,
@@ -79,6 +95,13 @@ def subgroup_metrics(
     threshold: float = 0.5,
     min_rows: int = 1,
 ) -> pd.DataFrame:
+    """Score each value of ``group_column`` separately (diagnostic slicing).
+
+    Callers may pass a single-class slice on purpose — the generator tables are
+    built from AI rows only. Columns that need both classes (``*_human``,
+    ``macro_*``, ``auroc``, ``average_precision``) are then structurally
+    degenerate; read ``recall_ai`` and ``support_ai`` for those tables.
+    """
     if group_column not in df.columns:
         return pd.DataFrame()
     rows = []
@@ -97,6 +120,12 @@ def subgroup_metrics(
 
 
 def add_length_buckets(df: pd.DataFrame) -> pd.DataFrame:
+    """Add short/medium/long tertiles of text length.
+
+    Buckets are tertiles *of the frame being evaluated*, not fixed character
+    thresholds, so bucket boundaries differ between splits and are only
+    comparable across models scored on the same split.
+    """
     out = df.copy()
     if "text_len_chars" not in out.columns:
         out["text_len_chars"] = out["text"].fillna("").astype(str).str.len()
@@ -137,7 +166,7 @@ def _safe_balanced_accuracy(y_true: np.ndarray, y_pred: np.ndarray) -> float:
 def _safe_log_loss(y_true: np.ndarray, score_ai: np.ndarray) -> float | None:
     try:
         proba = np.column_stack([1.0 - score_ai, score_ai])
-        return float(log_loss(y_true, proba, labels=[0, 1]))
+        return float(log_loss(y_true, proba, labels=LABELS))
     except ValueError:
         return None
 
