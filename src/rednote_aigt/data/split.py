@@ -1,8 +1,21 @@
-"""Train/validation/test splitting and leakage checks."""
+"""Train/validation/test splitting and leakage checks.
+
+Two guarantees back the held-out numbers:
+
+1. ``validate_splits`` raises if the *same* text value appears in two splits.
+2. ``near_duplicate_leakage`` reports texts that are identical once whitespace,
+   punctuation, and emoji are stripped — cheap protection against a "duplicate"
+   that differs only by a trailing 😊. It reports rather than raises, because
+   the right response depends on how many rows are involved.
+
+Neither catches paraphrase-level overlap; see the limitations in README.md.
+"""
 
 from __future__ import annotations
 
+import hashlib
 import logging
+import re
 from pathlib import Path
 from typing import Any
 
@@ -34,6 +47,10 @@ SPLIT_COLUMNS = [
 ]
 GROUP_CANDIDATES = ["original_id", "seed_id", "post_id", "note_id", "id"]
 
+# Everything that is not a Unicode word character: whitespace, punctuation,
+# emoji. CJK characters are word characters, so they survive.
+NON_WORD_RE = re.compile(r"[\W_]+", re.UNICODE)
+
 
 def create_splits(
     df: pd.DataFrame,
@@ -50,13 +67,15 @@ def create_splits(
 
     working = df.copy()
     group_col, group_note = detect_group_column(working)
-    stratify_col, stratify_note = choose_stratification_column(working, prefer_domain, min_stratum_count)
 
     if group_col:
         LOGGER.info("Using group-aware split with column %s", group_col)
         train_df, val_df, test_df = _group_split(working, group_col, train_ratio, val_ratio, test_ratio, seed)
         split_strategy = "group"
+        # Stratification is not applied on this path; do not claim it in the manifest.
+        stratify_col, stratify_note = None, "not applicable: group-aware split"
     else:
+        stratify_col, stratify_note = choose_stratification_column(working, prefer_domain, min_stratum_count)
         LOGGER.info("Using random stratified split: %s", stratify_col)
         train_df, val_df, test_df = _stratified_split(
             working,
@@ -73,8 +92,9 @@ def create_splits(
     test_df = _assign_split(test_df, "test")
     validate_splits(train_df, val_df, test_df)
 
+    splits = {"train": train_df, "val": val_df, "test": test_df}
     manifest = build_manifest(
-        {"train": train_df, "val": val_df, "test": test_df},
+        splits,
         seed=seed,
         ratios={"train": train_ratio, "val": val_ratio, "test": test_ratio},
         split_strategy=split_strategy,
@@ -83,6 +103,7 @@ def create_splits(
         group_column=group_col,
         group_note=group_note,
     )
+    manifest["near_duplicate_leakage"] = near_duplicate_leakage(splits)
     return train_df, val_df, test_df, manifest
 
 
@@ -103,10 +124,7 @@ def save_splits(
     ]
     existing = [path for path in targets if path.exists()]
     if existing and not force:
-        raise FileExistsError(
-            "Processed outputs already exist. Use --force to overwrite: "
-            + ", ".join(str(path) for path in existing)
-        )
+        raise FileExistsError("Processed outputs already exist. Use --force to overwrite: " + ", ".join(str(path) for path in existing))
 
     _select_columns(train_df).to_csv(processed_dir / "train.csv", index=False)
     _select_columns(val_df).to_csv(processed_dir / "val.csv", index=False)
@@ -114,7 +132,40 @@ def save_splits(
     write_json(manifest, processed_dir / "dataset_manifest.json")
 
 
+def near_duplicate_leakage(splits: dict[str, pd.DataFrame]) -> dict[str, Any]:
+    """Count texts shared across splits once punctuation/whitespace is stripped.
+
+    Exact duplicates are already removed before splitting, so any hit here is a
+    near-duplicate: same words, different decoration. Reported in the dataset
+    manifest so the number is visible instead of assumed to be zero.
+    """
+    fingerprints = {name: split_df["text"].map(text_fingerprint) for name, split_df in splits.items()}
+    unique = {name: set(values) for name, values in fingerprints.items()}
+    pairs = {
+        "train_val": unique["train"] & unique["val"],
+        "train_test": unique["train"] & unique["test"],
+        "val_test": unique["val"] & unique["test"],
+    }
+    report: dict[str, Any] = {f"{name}_shared_fingerprints": len(values) for name, values in pairs.items()}
+    shared = set().union(*pairs.values())
+    report["rows_involved"] = int(sum(int(values.isin(shared).sum()) for values in fingerprints.values()))
+    if shared:
+        LOGGER.warning(
+            "Near-duplicate texts cross split boundaries: %s fingerprints, %s rows. Held-out metrics may be optimistic.",
+            len(shared),
+            report["rows_involved"],
+        )
+    return report
+
+
+def text_fingerprint(text: object) -> str:
+    """Hash a text after removing whitespace, punctuation, and emoji."""
+    stripped = NON_WORD_RE.sub("", str(text)).casefold()
+    return hashlib.sha1(stripped.encode("utf-8")).hexdigest()
+
+
 def validate_splits(train_df: pd.DataFrame, val_df: pd.DataFrame, test_df: pd.DataFrame) -> None:
+    """Raise if a split is empty, missing a label, or shares an exact text with another."""
     splits = {"train": train_df, "val": val_df, "test": test_df}
     empty = [name for name, split_df in splits.items() if split_df.empty]
     if empty:
@@ -144,19 +195,22 @@ def choose_stratification_column(
     working = df.copy()
     working["_label_stratum"] = working["label"].astype(str)
     if prefer_domain and "domain" in working.columns:
-        working["_label_domain_stratum"] = (
-            working["label"].astype(str) + "__" + working["domain"].fillna("<missing>").astype(str)
-        )
+        working["_label_domain_stratum"] = working["label"].astype(str) + "__" + working["domain"].fillna("<missing>").astype(str)
         counts = working["_label_domain_stratum"].value_counts()
         if not counts.empty and int(counts.min()) >= max(4, min_stratum_count):
             return "_label_domain_stratum", "stratified by label+domain"
-        LOGGER.warning(
-            "Falling back to label-only stratification because label+domain strata are too small."
-        )
+        LOGGER.warning("Falling back to label-only stratification because label+domain strata are too small.")
     return "_label_stratum", "stratified by label only"
 
 
 def detect_group_column(df: pd.DataFrame) -> tuple[str | None, str]:
+    """Find a column that ties related rows together, so they stay in one split.
+
+    A column qualifies only if it is populated for essentially every row and
+    actually repeats — a unique id per row groups nothing. Every candidate is
+    examined before giving up, and the reasons are returned for the manifest.
+    """
+    rejected: list[str] = []
     for column in GROUP_CANDIDATES:
         if column not in df.columns or column == "id":
             continue
@@ -167,10 +221,9 @@ def detect_group_column(df: pd.DataFrame) -> tuple[str | None, str]:
         if coverage >= 0.95 and duplicate_groups > 0:
             return column, f"using group column {column}"
         if coverage > 0:
-            return None, (
-                f"found candidate group column {column}, but coverage={coverage:.3f} "
-                f"and duplicate_groups={duplicate_groups}; not usable for group-aware splitting"
-            )
+            rejected.append(f"{column} (coverage={coverage:.3f}, duplicate_groups={duplicate_groups})")
+    if rejected:
+        return None, ("no usable group column; candidates need coverage >= 0.95 and repeated values, but found: " + "; ".join(rejected))
     return None, "no stable original post id/seed id/post id column found for group-aware splitting"
 
 
@@ -179,11 +232,12 @@ def build_manifest(
     seed: int,
     ratios: dict[str, float],
     split_strategy: str,
-    stratify_column: str,
+    stratify_column: str | None,
     stratification_note: str,
     group_column: str | None,
     group_note: str,
 ) -> dict[str, Any]:
+    """Describe how the splits were produced, for the record written next to them."""
     return {
         "seed": seed,
         "ratios": ratios,
@@ -195,9 +249,7 @@ def build_manifest(
         "counts": {name: int(len(df)) for name, df in splits.items()},
         "label_counts": {name: _counts(df, "label") for name, df in splits.items()},
         "domain_counts": {name: _counts(df, "domain") for name, df in splits.items()},
-        "model_family_counts_aigc": {
-            name: _counts(df[df["label"] == 1], "model_family") for name, df in splits.items()
-        },
+        "model_family_counts_aigc": {name: _counts(df[df["label"] == 1], "model_family") for name, df in splits.items()},
         "model_counts_aigc": {name: _counts(df[df["label"] == 1], "model") for name, df in splits.items()},
         "model_input_columns": ["text"],
         "label_column": "label",

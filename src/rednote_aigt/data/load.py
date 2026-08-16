@@ -51,9 +51,7 @@ class LoadReport:
 def load_rednote_file(path: Path, label: int, sample: int | None = None) -> tuple[pd.DataFrame, LoadReport]:
     """Load one JSONL file and attach a binary label."""
     if not path.exists():
-        raise FileNotFoundError(
-            f"Required raw file not found: {path}. Download RedNote-Vibe and place it under data/raw/."
-        )
+        raise FileNotFoundError(f"Required raw file not found: {path}. Download RedNote-Vibe and place it under data/raw/.")
 
     rows: list[dict[str, Any]] = []
     malformed: list[tuple[int, str]] = []

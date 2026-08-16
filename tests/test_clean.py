@@ -29,6 +29,19 @@ def test_build_canonical_text_handles_empty_title_and_title_only():
     assert title_title_only is True
 
 
+def test_min_title_only_chars_measures_the_title_not_the_template():
+    """ "标题：标" is 4 characters of text but only a 1-character title."""
+    df = pd.DataFrame(
+        [
+            {"note_title": "标", "note_content": "", "label": 1},
+            {"note_title": "够长的标题", "note_content": "", "label": 0},
+        ]
+    )
+    cleaned, report = clean_posts(df, min_title_only_chars=3)
+    assert report["dropped_short_title_only_rows"] == 1
+    assert list(cleaned["text"]) == ["标题：够长的标题"]
+
+
 def test_clean_posts_drops_rows_with_no_text():
     df = pd.DataFrame(
         [

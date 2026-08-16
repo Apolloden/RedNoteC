@@ -1,4 +1,16 @@
-"""End-to-end data preparation pipeline."""
+"""End-to-end data preparation pipeline.
+
+``load → clean → audit → dedupe → split``, in that order and for a reason:
+
+* the audit runs on cleaned rows but *before* any split exists, so it can
+  describe the corpus without being influenced by (or influencing) the split;
+* deduplication runs before splitting, so a duplicated post cannot be trained
+  on and tested on. Texts carrying both labels are quarantined to
+  ``data/interim/label_conflicts.csv`` rather than silently kept.
+
+Every count produced along the way is written to ``prepare_summary.json`` and
+the dataset manifest.
+"""
 
 from __future__ import annotations
 
@@ -18,6 +30,7 @@ LOGGER = logging.getLogger(__name__)
 
 
 def prepare_data(config: dict[str, Any], sample: int | None = None, force: bool = False) -> dict[str, Any]:
+    """Turn the raw JSONL files into train/val/test CSVs plus audit reports."""
     paths = config.get("paths", {})
     split_cfg = config.get("split", {})
     cleaning_cfg = config.get("cleaning", {})

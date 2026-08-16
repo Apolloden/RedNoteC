@@ -1,4 +1,16 @@
-"""Conservative text cleaning and canonical text construction."""
+"""Conservative text cleaning and canonical text construction.
+
+Cleaning is deliberately minimal: whitespace and line endings only. Emoji,
+hashtags, punctuation, slang, and code-switching are the stylistic evidence
+that separates human from AI writing here, so normalizing them away would
+delete the signal being measured.
+
+Known artifact: the canonical text is a template, and a post without a title
+gets no ``标题：`` line. Title presence is label-skewed in RedNote-Vibe, so the
+prefix itself carries a little label information that has nothing to do with
+writing style. ``rednote_aigt.data.audit`` measures the skew by label; the
+consequence is written up under "Known artifacts" in README.md.
+"""
 
 from __future__ import annotations
 
@@ -36,7 +48,12 @@ def build_canonical_text(title: object, content: object) -> tuple[str, bool]:
 
 
 def clean_posts(df: pd.DataFrame, min_title_only_chars: int = 1) -> tuple[pd.DataFrame, dict[str, int]]:
-    """Clean title/content and drop rows with no usable text."""
+    """Clean title/content and drop rows with no usable text.
+
+    ``min_title_only_chars`` applies to rows that have a title and no content:
+    it is the shortest title kept as a standalone post, measured on the title
+    itself rather than on the templated text around it.
+    """
     cleaned = df.copy()
     cleaned["note_title"] = cleaned["note_title"].map(normalize_text)
     cleaned["note_content"] = cleaned["note_content"].map(normalize_text)
@@ -47,7 +64,7 @@ def clean_posts(df: pd.DataFrame, min_title_only_chars: int = 1) -> tuple[pd.Dat
     cleaned["text_len_chars"] = cleaned["text"].str.len()
 
     both_empty = cleaned["text"].eq("")
-    short_title_only = cleaned["title_only"] & (cleaned["text_len_chars"] < min_title_only_chars)
+    short_title_only = cleaned["title_only"] & (cleaned["note_title"].str.len() < min_title_only_chars)
     drop_mask = both_empty | short_title_only
     report = {
         "input_rows": int(len(df)),

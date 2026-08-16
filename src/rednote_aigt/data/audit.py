@@ -1,4 +1,10 @@
-"""Dataset audit summaries and report writers."""
+"""Dataset audit summaries and report writers.
+
+Runs before any split exists. Its job is to surface the things that would
+quietly invalidate a result: metadata columns that are label-determined,
+duplicate or cross-label texts, and formatting skew such as title presence.
+Nothing here changes the data — it only describes it.
+"""
 
 from __future__ import annotations
 
@@ -30,13 +36,12 @@ def build_audit_report(df: pd.DataFrame, load_reports: list[Any] | None = None) 
         "model_counts_aigc": _value_counts(df[df["label"] == 1], "model") if "model" in df else {},
         "missing_field_counts": _missing_counts(df),
         "empty_counts": _empty_counts(df),
+        "empty_title_counts_by_label": _empty_title_counts_by_label(df),
         "duplicate_text_counts": _duplicate_counts(df),
         "human_aigc_exact_text_overlap": _text_overlap(df),
         "length_stats_by_label": _length_stats(df, ["label"]),
         "length_stats_by_domain": _length_stats(df, ["domain"]) if "domain" in df else {},
-        "suspicious_columns_not_for_model_features": [
-            col for col in SUSPICIOUS_MODEL_FEATURE_COLUMNS if col in df.columns
-        ],
+        "suspicious_columns_not_for_model_features": [col for col in SUSPICIOUS_MODEL_FEATURE_COLUMNS if col in df.columns],
     }
     return report
 
@@ -58,6 +63,7 @@ def render_audit_markdown(report: dict[str, Any]) -> str:
         f"- Label counts: `{report.get('label_counts', {})}`",
         f"- Duplicate texts: `{report.get('duplicate_text_counts', {})}`",
         f"- Human/AIGC exact text overlap: `{report.get('human_aigc_exact_text_overlap', {})}`",
+        f"- Empty titles by label (0=human, 1=AI): `{report.get('empty_title_counts_by_label', {})}`",
         f"- Suspicious columns excluded from model features: `{report.get('suspicious_columns_not_for_model_features', [])}`",
         "",
         "## Missing Fields",
@@ -107,6 +113,28 @@ def _missing_counts(df: pd.DataFrame) -> dict[str, int]:
     return {col: int(df[col].isna().sum()) for col in df.columns}
 
 
+def _empty_title_counts_by_label(df: pd.DataFrame) -> dict[str, dict[str, float]]:
+    """How often each label is missing a title.
+
+    The canonical text only gets a ``标题：`` line when a title exists, so a
+    label-skewed title rate is a formatting cue a model can learn instead of
+    writing style. This is the number that quantifies it.
+    """
+    if not {"note_title", "label"}.issubset(df.columns):
+        return {}
+    empty = df["note_title"].fillna("").astype(str).str.len().eq(0)
+    result: dict[str, dict[str, float]] = {}
+    for label, group in empty.groupby(df["label"]):
+        rows = int(len(group))
+        empty_rows = int(group.sum())
+        result[str(label)] = {
+            "rows": rows,
+            "empty_title_rows": empty_rows,
+            "empty_title_share": round(empty_rows / rows, 6) if rows else 0.0,
+        }
+    return result
+
+
 def _empty_counts(df: pd.DataFrame) -> dict[str, int]:
     counts = {}
     for col in ["note_title", "note_content", "text"]:
@@ -119,11 +147,7 @@ def _duplicate_counts(df: pd.DataFrame) -> dict[str, Any]:
     if "text" not in df:
         return {}
     duplicated = df.duplicated("text", keep=False)
-    by_label = (
-        df.loc[duplicated].groupby("label").size().astype(int).to_dict()
-        if "label" in df and duplicated.any()
-        else {}
-    )
+    by_label = df.loc[duplicated].groupby("label").size().astype(int).to_dict() if "label" in df and duplicated.any() else {}
     return {
         "duplicate_rows_overall": int(duplicated.sum()),
         "duplicate_text_values_overall": int(df["text"].duplicated().sum()),
