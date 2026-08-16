@@ -1,10 +1,24 @@
-"""Training CLI implementation."""
+"""Training CLI implementation.
+
+Both model families share this entry point so they see identical data handling.
+Two rules hold on every path:
+
+* Only ``text`` and ``label`` reach a model. ``load_training_frame`` narrows the
+  frame to those two columns, which is what keeps ``model_family``/``model``
+  (populated for AI rows, null for human rows) out of the features — see
+  ``FORBIDDEN_FEATURE_COLUMNS`` and ``tests/test_tfidf_smoke.py``.
+* The test split is never opened here. Model selection uses validation only.
+
+The resolved config is written next to the model and into the reports directory
+so a run's metrics can always be traced back to the settings that produced them.
+"""
 
 from __future__ import annotations
 
+import inspect
 import logging
 import random
-import inspect
+import shutil
 from pathlib import Path
 from typing import Any
 
@@ -27,6 +41,8 @@ from rednote_aigt.utils.progress import log_heartbeat
 LOGGER = logging.getLogger(__name__)
 
 FORBIDDEN_FEATURE_COLUMNS = ["local_time", "likes", "collections", "comments", "domain", "model_family", "model"]
+# Not model artifacts, so their presence must not make a directory look "used".
+NON_ARTIFACT_ENTRIES = {".gitkeep", ".DS_Store"}
 
 try:
     from transformers import TrainerCallback
@@ -54,9 +70,26 @@ def train_model(
     batch_size: int | None = None,
     max_length: int | None = None,
 ) -> dict[str, Any]:
+    """Train one registered model and write artifacts, metrics, and plots.
+
+    CLI arguments override the YAML config (never the reverse), and the merged
+    result is saved as ``train_config_resolved.json``.
+
+    Args:
+        model_name: Key in ``configs/models.yaml`` and in the model registry.
+        max_steps: Transformer-only step cap for smoke tests. Setting it also
+            enables the tiny-model fallback, so runs that use it are not
+            research results.
+
+    Returns:
+        ``{"train": ..., "val": ...}`` metrics, plus transformer training logs.
+    """
     ensure_dir(reports_dir)
     ensure_dir(figures_dir)
-    _prepare_output_dir(output_dir, force)
+    # Refuse early if artifacts are in the way, but do not delete them yet: a
+    # --force run that then fails on missing data must not destroy the model it
+    # was going to replace.
+    replaceable_artifacts = _check_output_dir(output_dir, force)
     set_seed(seed)
 
     resolved_config = dict(model_config)
@@ -80,6 +113,7 @@ def train_model(
     LOGGER.info("Loading validation data from %s", val_path)
     val_df = load_training_frame(val_path, model_config["text_column"], model_config["label_column"], max_val_samples, seed)
     LOGGER.info("Loaded %s validation rows", len(val_df))
+    _clear_output_dir(replaceable_artifacts)
     LOGGER.info("Saving resolved train config to %s and %s", reports_dir, output_dir)
     write_json(resolved_config, reports_dir / "train_config_resolved.json")
     write_json(resolved_config, output_dir / "train_config_resolved.json")
@@ -109,6 +143,12 @@ def load_training_frame(
     max_samples: int | None,
     seed: int,
 ) -> pd.DataFrame:
+    """Read a split and return only the model input and the label.
+
+    This narrowing is the leakage guard: metadata columns present in the CSV
+    (``domain``, ``model_family``, ``model``, engagement counts) are dropped
+    here and cannot reach a model downstream.
+    """
     if not path.exists():
         raise FileNotFoundError(f"Missing processed split: {path}")
     df = pd.read_csv(path)
@@ -456,19 +496,22 @@ def build_training_arguments_kwargs(
     return filtered
 
 
-def _prepare_output_dir(path: Path, force: bool) -> None:
+def _check_output_dir(path: Path, force: bool) -> list[Path]:
+    """Return the artifacts ``force`` would replace, raising if it was not given."""
     ensure_dir(path)
-    existing = [item for item in path.iterdir() if item.name != ".gitkeep"]
+    existing = [item for item in path.iterdir() if item.name not in NON_ARTIFACT_ENTRIES]
     if existing and not force:
         raise FileExistsError(f"Model output directory is not empty: {path}. Use --force to overwrite.")
-    if force:
-        for item in existing:
-            if item.is_dir():
-                import shutil
+    return existing if force else []
 
-                shutil.rmtree(item)
-            else:
-                item.unlink()
+
+def _clear_output_dir(existing: list[Path]) -> None:
+    """Delete the previous run's artifacts, once the new run is sure to start."""
+    for item in existing:
+        if item.is_dir():
+            shutil.rmtree(item)
+        else:
+            item.unlink()
 
 
 def _softmax(logits: np.ndarray) -> np.ndarray:

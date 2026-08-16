@@ -1,8 +1,9 @@
 import pandas as pd
+import pytest
 
 from rednote_aigt.evaluation.evaluate import evaluate_model
 from rednote_aigt.models.tfidf import TfidfLogRegClassifier
-from rednote_aigt.training.train import FORBIDDEN_FEATURE_COLUMNS, load_training_frame
+from rednote_aigt.training.train import FORBIDDEN_FEATURE_COLUMNS, load_training_frame, train_model
 
 
 def tiny_tfidf_config():
@@ -51,6 +52,27 @@ def test_training_loader_only_returns_text_and_label(tmp_path):
     loaded = load_training_frame(path, "text", "label", max_samples=None, seed=42)
     assert list(loaded.columns) == ["text", "label"]
     assert not any(col in loaded.columns for col in FORBIDDEN_FEATURE_COLUMNS)
+
+
+def test_force_keeps_existing_model_when_the_run_cannot_start(tmp_path):
+    """--force must not delete a trained model before the new run is viable."""
+    output_dir = tmp_path / "model"
+    output_dir.mkdir()
+    (output_dir / "model.joblib").write_text("previous model")
+
+    with pytest.raises(FileNotFoundError):
+        train_model(
+            model_name="tfidf_logreg",
+            model_config=tiny_tfidf_config(),
+            train_path=tmp_path / "missing_train.csv",
+            val_path=tmp_path / "missing_val.csv",
+            output_dir=output_dir,
+            reports_dir=tmp_path / "reports",
+            figures_dir=tmp_path / "figures",
+            force=True,
+        )
+
+    assert (output_dir / "model.joblib").read_text() == "previous model"
 
 
 def test_evaluation_handles_missing_optional_metadata_columns(tmp_path):
