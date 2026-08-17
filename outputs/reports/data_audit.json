@@ -104,6 +104,18 @@
     "note_content": 0,
     "text": 0
   },
+  "empty_title_counts_by_label": {
+    "0": {
+      "rows": 51878,
+      "empty_title_rows": 7411,
+      "empty_title_share": 0.142854
+    },
+    "1": {
+      "rows": 7254,
+      "empty_title_rows": 0,
+      "empty_title_share": 0.0
+    }
+  },
   "duplicate_text_counts": {
     "duplicate_rows_overall": 490,
     "duplicate_text_values_overall": 250,

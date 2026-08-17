@@ -4,6 +4,7 @@
 - Label counts: `{'0': 51878, '1': 7254}`
 - Duplicate texts: `{'duplicate_rows_overall': 490, 'duplicate_text_values_overall': 250, 'duplicate_rows_by_label': {'0': 490}}`
 - Human/AIGC exact text overlap: `{'overlap_text_values': 0, 'rows_in_overlap': 0}`
+- Empty titles by label (0=human, 1=AI): `{'0': {'rows': 51878, 'empty_title_rows': 7411, 'empty_title_share': 0.142854}, '1': {'rows': 7254, 'empty_title_rows': 0, 'empty_title_share': 0.0}}`
 - Suspicious columns excluded from model features: `['local_time', 'likes', 'collections', 'comments', 'domain', 'model_family', 'model']`
 
 ## Missing Fields
