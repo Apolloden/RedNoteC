@@ -30,7 +30,11 @@ dev = ["pytest"]
 where = ["src"]
 
 [tool.pytest.ini_options]
-pythonpath = ["src"]
+# "src" resolves rednote_aigt; "." resolves scripts.* (no __init__.py, so it's
+# only importable when the repo root is on sys.path). Without this, tests pass
+# under `python -m pytest` (which auto-adds cwd) but fail under bare `pytest`
+# (which does not) — exactly the gap between local runs and CI.
+pythonpath = ["src", "."]
 testpaths = ["tests"]
 
 [tool.ruff]
