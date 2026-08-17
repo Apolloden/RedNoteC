@@ -1,0 +1,15 @@
+{
+  "model": "tfidf_logreg",
+  "mode": "control",
+  "families": [
+    "gpt",
+    "deepseek",
+    "qwen",
+    "gemini",
+    "glm",
+    "anthropic"
+  ],
+  "threshold": 0.5,
+  "seed": 42,
+  "design": "Train and validation drop the same NUMBER of AI rows as the holdout fold, sampled at random across all families, with the target family retained; the test set is identical to the holdout fold's. Isolates training-set size from generator novelty."
+}

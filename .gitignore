@@ -85,6 +85,12 @@ outputs/**/*.log
 outputs/**/*smoke*
 MPLCONFIGDIR/
 
+# Per-fold diagnostic plots from the generator-holdout sweeps: 12 folds x 8
+# figures that nothing references. The summary figure and every per-fold metric
+# are kept.
+outputs/figures/*/generator_holdout/
+outputs/figures/*/generator_holdout_control/
+
 # ---------------------------------------------------------------------------
 # Hugging Face / torch caches
 # ---------------------------------------------------------------------------

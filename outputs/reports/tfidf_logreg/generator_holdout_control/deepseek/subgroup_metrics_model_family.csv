@@ -1,0 +1,2 @@
+model_family,rows,accuracy,balanced_accuracy,precision_human,recall_human,f1_human,precision_ai,recall_ai,f1_ai,macro_precision,macro_recall,macro_f1,weighted_f1,log_loss,auroc,average_precision,support_human,support_ai,threshold
+deepseek,244,0.8934426229508197,0.8934426229508197,0.0,0.0,0.0,1.0,0.8934426229508197,0.9437229437229437,0.5,0.44672131147540983,0.47186147186147187,0.9437229437229437,0.2770672392696804,,,0,244,0.5

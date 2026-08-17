@@ -1,0 +1,2 @@
+model_family,rows,accuracy,balanced_accuracy,precision_human,recall_human,f1_human,precision_ai,recall_ai,f1_ai,macro_precision,macro_recall,macro_f1,weighted_f1,log_loss,auroc,average_precision,support_human,support_ai,threshold
+qwen,183,0.9180327868852459,0.9180327868852459,0.0,0.0,0.0,1.0,0.9180327868852459,0.9572649572649573,0.5,0.45901639344262296,0.47863247863247865,0.9572649572649573,0.23247574598996645,,,0,183,0.5

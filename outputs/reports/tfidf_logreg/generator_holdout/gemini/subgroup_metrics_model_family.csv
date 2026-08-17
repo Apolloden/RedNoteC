@@ -1,0 +1,2 @@
+model_family,rows,accuracy,balanced_accuracy,precision_human,recall_human,f1_human,precision_ai,recall_ai,f1_ai,macro_precision,macro_recall,macro_f1,weighted_f1,log_loss,auroc,average_precision,support_human,support_ai,threshold
+gemini,181,0.9226519337016574,0.9226519337016574,0.0,0.0,0.0,1.0,0.9226519337016574,0.9597701149425287,0.5,0.4613259668508287,0.47988505747126436,0.9597701149425287,0.23417647437695005,,,0,181,0.5

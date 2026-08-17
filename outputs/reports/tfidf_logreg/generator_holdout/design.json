@@ -1,0 +1,14 @@
+{
+  "model": "tfidf_logreg",
+  "families": [
+    "gpt",
+    "deepseek",
+    "qwen",
+    "gemini",
+    "glm",
+    "anthropic"
+  ],
+  "threshold": 0.5,
+  "seed": 42,
+  "design": "Train and validation exclude the held-out family's AI rows; the test set is the standard test split restricted to human rows plus the held-out family's AI rows."
+}

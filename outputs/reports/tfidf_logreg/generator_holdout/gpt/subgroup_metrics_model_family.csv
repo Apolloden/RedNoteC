@@ -1,0 +1,2 @@
+model_family,rows,accuracy,balanced_accuracy,precision_human,recall_human,f1_human,precision_ai,recall_ai,f1_ai,macro_precision,macro_recall,macro_f1,weighted_f1,log_loss,auroc,average_precision,support_human,support_ai,threshold
+gpt,249,0.7871485943775101,0.7871485943775101,0.0,0.0,0.0,1.0,0.7871485943775101,0.8808988764044944,0.5,0.39357429718875503,0.4404494382022472,0.8808988764044944,0.44329023239657617,,,0,249,0.5
