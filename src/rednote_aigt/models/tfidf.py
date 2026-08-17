@@ -1,4 +1,15 @@
-"""TF-IDF + class-weighted Logistic Regression baseline."""
+"""TF-IDF + class-weighted Logistic Regression baseline.
+
+Character n-grams, not words: RedNote text is emoji-heavy, slangy, and
+code-switched, so a word segmenter would itself be a confound. Characters need
+no segmenter and still capture local surface patterns.
+
+``class_weight="balanced"`` handles the 12% AI prevalence, at the cost of
+probability calibration — scores are pushed toward the positive class, so this
+model's 0.5 threshold is a more aggressive operating point than the
+transformer's. Ranking metrics (AUROC, AUPRC) are unaffected; threshold
+metrics should be read with that in mind.
+"""
 
 from __future__ import annotations
 
@@ -73,6 +84,7 @@ class TfidfLogRegClassifier:
         show_progress: bool = False,
         desc: str = "TF-IDF scoring",
     ) -> np.ndarray:
+        """Return P(AI) per text — column 1, because classes_ is sorted [0, 1]."""
         return self.predict_proba(texts, show_progress=show_progress, desc=desc)[:, 1]
 
     def save(self, path: Path, model_name: str = "tfidf_logreg") -> None:

@@ -1,4 +1,18 @@
-"""Transformer sequence classifier wrapper."""
+"""Transformer sequence classifier wrapper.
+
+Wraps ``AutoModelForSequenceClassification`` (default
+``hfl/chinese-roberta-wwm-ext``) so the training and evaluation code can treat
+it like the TF-IDF baseline: fit, then ``score_ai``-style probabilities.
+
+Note the input asymmetry against the baseline: text is truncated to
+``max_length`` tokens (256 by default), so on long posts this model sees a
+prefix while TF-IDF sees the whole post.
+
+``allow_smoke_fallback`` swaps in a tiny model when the real one cannot be
+downloaded. It exists to keep smoke tests running offline; the substitution is
+recorded in ``transformer_load_status.json``, and any run with
+``fallback_used: true`` is a code-path check, not a result.
+"""
 
 from __future__ import annotations
 
@@ -124,6 +138,7 @@ class TransformerClassifier:
         prefer_mps: bool = True,
         prefer_cuda: bool = False,
     ) -> np.ndarray:
+        """Return P(AI) per text, in input order, batched under ``torch.no_grad``."""
         import torch
 
         if self.model is None or self.tokenizer is None:
