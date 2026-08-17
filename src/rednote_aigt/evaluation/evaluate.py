@@ -1,4 +1,12 @@
-"""Evaluation CLI implementation."""
+"""Evaluation CLI implementation.
+
+Both models run through this one function, which is what makes the numbers in
+README.md a like-for-like comparison: same split, same threshold, same metric
+code, same subgroup slicing. Only ``score_ai`` is model-specific.
+
+Everything written here is a report about a finished model — nothing in this
+module is allowed to influence training or model selection.
+"""
 
 from __future__ import annotations
 
@@ -45,6 +53,19 @@ def evaluate_model(
     prefer_cuda: bool = False,
     max_length: int | None = None,
 ) -> dict[str, Any]:
+    """Score a saved model on one split and write metrics, tables, and figures.
+
+    Args:
+        model_dir: Directory written by ``scripts/train.py``; its
+            ``model_metadata.json`` decides how the model is loaded and scored.
+        test_path: CSV split to score. Only ``text`` and ``label`` are read;
+            metadata columns are used for subgroup tables and error dumps only.
+        threshold: Probability cut for the hard label. Reported alongside every
+            metric, since precision/recall are meaningless without it.
+
+    Returns:
+        The overall metric dict, also written to ``metrics.json``.
+    """
     ensure_dir(output_dir)
     ensure_dir(figures_dir)
 
@@ -140,6 +161,10 @@ def _save_subgroup(df: pd.DataFrame, group_column: str, path: Path, threshold: f
     metrics_df = subgroup_metrics(df, group_column, threshold=threshold)
     if not metrics_df.empty:
         metrics_df.to_csv(path, index=False)
+    elif path.exists():
+        # Otherwise a table from an earlier run would sit next to this run's
+        # metrics and read as current evidence.
+        path.unlink()
     return metrics_df
 
 
