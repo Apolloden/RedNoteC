@@ -42,12 +42,55 @@ because missing AI-generated posts is central to the task. Macro F1 treats human
 and AI labels equally. AUROC and AUPRC evaluate ranking quality from model
 scores.
 
+Two conventions make the numbers comparable across slices:
+
+- Every metric is computed over the fixed label set `[0, 1]`. Without this,
+  scikit-learn averages over the labels it happens to observe, and a subgroup
+  containing only AI rows would report a two-class macro score that is not
+  comparable to the same metric on the full split.
+- AUROC and AUPRC are reported as empty when only one class is present, rather
+  than as a substituted number.
+
+Threshold metrics (precision, recall, F1, accuracy) depend on both the model and
+its calibration. `class_weight="balanced"` shifts the baseline's probabilities
+toward the positive class, so at a shared 0.5 threshold the two models sit at
+different operating points on their own curves. AUROC and AUPRC are threshold-
+free and are the cleaner head-to-head comparison; the threshold metrics answer
+"what happens if you deploy this as configured".
+
+## Generator holdout
+
+The random split measures detection of generators the model was trained on. It
+cannot separate "this text was written by a machine" from "this text was written
+by one of the six machines in my training set", because both hypotheses predict
+the same in-distribution score.
+
+`scripts/holdout_generator.py` separates them. For each generator family, the
+model is retrained with that family's posts removed from training *and*
+validation, then scored on the standard test split reduced to human posts plus
+that family's posts. Because the test rows are the same ones the main model was
+scored on in `subgroup_metrics_model_family.csv`, the two recalls differ only in
+whether the family was in training.
+
+Read `recall_ai` across folds. Precision and AUPRC are not comparable between
+folds: each fold keeps all 7,747 human test rows but only one family's AI rows,
+so prevalence changes with the family. AUROC and the false-positive count stay
+comparable.
+
+Removing a family also removes 10-24% of the AI training rows, so a recall drop
+could in principle be data volume rather than novelty.
+`build_size_matched_control` isolates that: it removes the same number of AI
+rows sampled at random across all families while keeping the target family in
+training, which splits the drop into a volume component and a novelty
+component.
+
 ## Limitations
 
 - Class imbalance means accuracy can look high even when AI recall is weak.
-- Title presence is label-skewed: many human rows have empty titles while AI rows
-  in the processed data do not.
+- Title presence is label-skewed: 14.29% of human rows have no title against 0%
+  of AI rows, so the `标题：` line in the canonical text is itself weak label
+  evidence. `scripts/audit_data.py` reports `empty_title_counts_by_label`.
+- The transformer truncates input at 256 tokens while TF-IDF sees the full post,
+  so the two models are not given identical information on long posts.
 - Text length differs by label; human rows are longer on average.
 - Domain labels are noisy and some examples appear domain-inconsistent.
-- The current split is a fixed random label+domain stratified split, not a
-  held-out-generator evaluation.

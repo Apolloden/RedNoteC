@@ -1,68 +1,90 @@
 # RedNoteC — Text-Only Detection of AI-Generated RedNote Posts
 
-A reproducible comparison of a lightweight lexical baseline and a Chinese
-transformer encoder on binary AI-vs-human classification of Chinese
-RedNote/Xiaohongshu (小红书) posts, using the
-[RedNote-Vibe](https://github.com/ydli-ai/RedNote-Vibe) corpus.
+Can a classifier tell an AI-written Xiaohongshu (小红书) post from a human one using nothing but the post itself? We put a character n-gram TF-IDF baseline against a Chinese RoBERTa encoder on 58,882 posts from [RedNote-Vibe](https://github.com/ydli-ai/RedNote-Vibe), then asked the question that decides whether any of it survives contact with the real world: what happens when the detector meets a generator nobody trained it on?
 
-**Research question:** for detecting AI-generated RedNote posts from title and
-content alone, does a contextual transformer provide a meaningful advantage over
-a character n-gram TF-IDF baseline?
+Three things came out of it.
 
-**Answer:** yes, but the advantage is in recall and ranking quality, not raw
-accuracy. The transformer cuts missed AI posts from 113 to 30 (AI recall 0.8959
-→ 0.9724) at the cost of 30 extra human false positives, for a ~7× longer
-training run.
+1. The transformer wins, but not where the leaderboard says. Accuracy moves 0.9768 → 0.9828. The number that actually changes is missed AI posts: 113 drops to 30.
+2. That gain is not free. Catching those 83 extra posts costs 30 more real users wrongly flagged as bots.
+3. Both of those numbers flatter the models. Hold a generator out of training entirely and the baseline's recall falls on every one of the six families, by as much as 14 points. A size-matched control shows that 81% of the fall is the generator being unfamiliar, not the smaller training set.
 
 ---
 
-## Results
+## The headline comparison
 
-Held-out test split, threshold 0.5:
+Held-out test split of 8,833 posts, 12.3% AI-generated, threshold 0.5:
 
-| Model | Accuracy | Macro-F1 | AUROC | AUPRC |
-| --- | --- | --- | --- | --- |
-| Majority class | 0.8771 | 0.4672 | 0.5000 | 0.1229 |
-| TF-IDF + LogReg (char n-gram) | 0.9768 | 0.9457 | 0.9899 | 0.9648 |
-| chinese-roberta-wwm-ext | **0.9828** | **0.9615** | **0.9964** | **0.9882** |
+| Model                         | Accuracy   | Macro-F1   | AUROC      | AUPRC      |
+| ----------------------------- | ---------- | ---------- | ---------- | ---------- |
+| Majority class ("all human")  | 0.8771     | 0.4672     | 0.5000     | 0.1229     |
+| TF-IDF + LogReg (char n-gram) | 0.9768     | 0.9457     | 0.9899     | 0.9648     |
+| chinese-roberta-wwm-ext       | **0.9828** | **0.9615** | **0.9964** | **0.9882** |
 
-Test set: 8,833 posts, 12.3% AI-generated.
+Accuracy is nearly useless on this data. Answer "human" every time and you score 87.7% without reading a character. What separates the models is which mistakes they make:
 
-The majority-class row is the analytic constant predictor (always "human"): its
-AUROC is 0.5 by definition and its AUPRC equals the positive-class prevalence.
-It is the number every other row has to beat, and it is why accuracy alone is
-not a usable metric on this split — 87.7% accuracy is available for free.
+| Model                   | Humans flagged as AI | AI posts missed | AI recall (95% CI)      |
+| ----------------------- | -------------------- | --------------- | ----------------------- |
+| TF-IDF + LogReg         | 92                   | 113             | 0.8959 [0.8764, 0.9127] |
+| chinese-roberta-wwm-ext | 122                  | 30              | 0.9724 [0.9608, 0.9806] |
 
-### Error profile
+The recall intervals do not overlap, so the transformer's advantage is not sampling noise. Whether it is worth having depends on what a flag does. A human review queue can swallow 122 false positives. An automatic ban cannot. Those are 122 real people accused of being bots.
 
-The aggregate table understates the difference. The confusion matrices do not:
+Both models trained on the same Apple Silicon machine in a single pass over the data: scikit-learn on CPU for the baseline, the MPS GPU backend for the encoder (`train_runtime` 4,339 s, about 72 minutes).
 
-| Model | True human → pred AI | True AI → pred human | AI recall | AI precision | Train time |
-| --- | --- | --- | --- | --- | --- |
-| TF-IDF + LogReg | 92 | 113 | 0.8959 | 0.9136 | ~10 min (CPU) |
-| chinese-roberta-wwm-ext | 122 | 30 | 0.9724 | 0.8964 | ~72 min (A100) |
+---
 
-This is a trade-off, not a uniform win. The transformer is the better choice for
-recall-oriented detection; the baseline is stronger if human false positives are
-expensive — flagging real users as bots has a real cost in a moderation setting.
+## Does it detect AI text, or does it detect these six models?
 
-### Where the baseline breaks down
+This is the part most detection papers leave out, and it is the part that decides whether a detector is worth deploying. Every number above comes from a random split, where each generator in the test set also appears in training. A model that has memorized how GPT phrases a skincare post scores exactly the same as a model that has learned what machine writing looks like. In-distribution accuracy cannot tell those two apart.
 
-Subgroup metrics (`outputs/reports/*/subgroup_metrics_*.csv`) show *where* the
-extra capacity pays for itself:
+So we forced them apart. For each generator family, the baseline was retrained from scratch with that family deleted from training _and_ validation, then scored on the same test rows the original model saw: all 7,747 human posts plus that one family's posts. Nothing else changed, so the only difference between the first and last columns below is whether the model had ever read that generator's output.
 
-- **Domain.** 学习 (study/education) is the weakest domain for both models, but the
-  gap is widest there: TF-IDF AI recall 0.6944 vs. transformer 0.9444. Study
-  posts are explanatory and structured, so human and AI writing converge on
-  surface form.
-- **Post length.** TF-IDF AI recall decays with length (0.9400 short → 0.8247
-  long); the transformer holds (0.9794 / 0.9638 / 0.9691). In a long post a few
-  AI-like phrases are diluted among ordinary ones, weakening character n-gram
-  evidence.
-- **Generator family.** GLM is hardest for both (TF-IDF 0.7177, transformer
-  0.8871); Qwen is easiest for the transformer (1.0000). Note this is computed
-  over AI rows in the same random split, so it is diagnostic — not evidence of
-  unseen-generator generalization.
+| Generator held out | Test posts | Recall, generator seen | Size-matched control | Recall, generator unseen | Cost of the generator being new |
+| ------------------ | ---------: | ---------------------: | -------------------: | -----------------------: | ------------------------------: |
+| deepseek           |        244 |                 0.9057 |               0.8934 |               **0.7705** |                          −0.123 |
+| gpt                |        249 |                 0.9036 |               0.8795 |               **0.7871** |                          −0.092 |
+| anthropic          |        105 |                 0.8571 |               0.8571 |               **0.8095** |                          −0.048 |
+| gemini             |        181 |                 0.9669 |               0.9503 |               **0.9227** |                          −0.028 |
+| glm                |        124 |                 0.7177 |               0.7016 |               **0.6774** |                          −0.024 |
+| qwen               |        183 |                 0.9454 |               0.9344 |               **0.9180** |                          −0.016 |
+
+Across the six folds, missed AI posts climb from 113 to 198. Recall falls for every single family, and it falls furthest on DeepSeek and GPT, two of the three the model handled best when it had seen them.
+
+The middle column is there because the first version of this result was not trustworthy. Removing a family also removes 10-24% of the AI training rows, and the two largest drops belonged to the two largest families, so "unseen generator is hard" and "less training data is hard" predicted the same table. The control separates them: it deletes the same number of AI rows at random and keeps the family in. Volume costs 0.013 recall on average. The generator being new costs 0.055. Four fifths of the damage is novelty.
+
+One number refuses to fall with the others. AUROC across the held-out folds stays between 0.951 and 0.995, against 0.9899 in-distribution. The model still sorts unseen-generator posts above human ones almost as well as it ever did. What breaks is where 0.5 lands on that ranking. Scores for an unfamiliar generator shift down as a group and slide under a threshold that was calibrated on familiar ones. That is a friendlier failure than it first looks: it is a recalibration problem, not a representation problem, and a deployment that tunes its threshold per generation of models would recover much of the loss.
+
+Anthropic is the cleanest illustration. Dropping 10% of AI training rows at random costs nothing at all (0.8571 either way), and dropping Claude's posts specifically costs 4.8 points.
+
+<p align="center">
+  <img src="outputs/figures/tfidf_logreg/generator_holdout_recall.png" width="80%" alt="AI recall per generator family under three training conditions">
+</p>
+
+Per-fold metrics are in `outputs/reports/tfidf_logreg/generator_holdout/`, and the three-way decomposition is `decomposition.csv` in the same directory.
+
+### Reading the fold tables
+
+Read `recall_ai` when comparing folds. Precision and AUPRC are not comparable across folds. Each fold keeps all 7,747 human rows but only one family's AI rows, so the positive-class rate moves with the family. AUROC and the false-positive count stay comparable.
+
+### Running the same test on the transformer
+
+The experiment is model-agnostic; only the runtime changes:
+
+```bash
+python3 scripts/holdout_generator.py --model transformer_roberta --device auto
+```
+
+We did not run it. Each fold is a full fine-tune of `chinese-roberta-wwm-ext`, roughly 70 minutes per family on Apple Silicon, so about seven hours for the six-family sweep, against a few minutes per fold for the baseline. The script writes each fold's metrics as it finishes, so the sweep can be stopped and resumed a family at a time, and `--families glm qwen` runs just the extremes. Whether the encoder degrades the same way is the obvious next experiment, and the interesting possibility is that it degrades _less_: contextual representations may key on register and discourse rather than the character habits a specific model happens to have.
+
+---
+
+## Where the baseline breaks down
+
+Slicing the test set shows the transformer's edge is concentrated exactly where surface statistics run out.
+
+- **Study posts (学习)** are the hardest domain for both models and the widest gap between them: 0.6944 AI recall for TF-IDF against 0.9444. Explanatory, structured writing is where human and machine prose converge.
+- **Long posts** break the baseline and not the encoder. TF-IDF slides from 0.9400 to 0.8247 across length thirds; the transformer holds at 0.9794 / 0.9638 / 0.9691. Spread a few machine-sounding phrases through a long post and character n-gram evidence gets diluted.
+- **GLM is the hardest generator to catch** for both models (0.7177 vs. 0.8871).
 
 <p align="center">
   <img src="outputs/figures/tfidf_logreg/confusion_matrix.png" width="45%" alt="TF-IDF confusion matrix">
@@ -71,218 +93,60 @@ extra capacity pays for itself:
 
 ---
 
-## Design decision: text-only inputs
+## Text-only inputs
 
-The single non-negotiable constraint of the project. Model input is built only
-from the post itself:
+Model input is the post and nothing else:
 
 ```text
 标题：{note_title}
 正文：{note_content}
 ```
 
-RedNote-Vibe also ships `domain`, `model_family`, `model`, `local_time`,
-`likes`, `collections`, and `comments`. **None of these are model features.**
-They are retained strictly for auditing, stratified splitting, subgroup
-reporting, and error analysis.
+RedNote-Vibe also ships `domain`, `model_family`, `model`, timestamps, and engagement counts. None are features. `model_family` and `model` are filled in for AI rows and empty for human rows, so a classifier handed either would score almost perfectly while learning nothing about writing, and none of these exist at inference time anyway. They are kept for auditing and the subgroup analysis only.
 
-The reason is leakage. `model_family` and `model` are populated for AI rows and
-null for human rows — a classifier given that column would score near-perfectly
-while learning nothing about AI-generated writing. Metadata artifacts of that
-kind are unavailable at inference time in any real deployment, so admitting them
-would make the headline number meaningless.
+Cleaning stops at whitespace and exact duplicates. Emoji, hashtags, punctuation and code-switching all survive, because in Chinese social media that is where the style lives.
 
-Label convention: `0 = human`, `1 = AI`.
-
-Cleaning is deliberately conservative — whitespace normalization, line-ending
-standardization, exact-duplicate removal. Emojis, hashtags, punctuation, slang,
-and code-switching are **preserved**, because in Chinese social-media text those
-carry the stylistic signal that separates human from AI writing. Aggressive
-normalization would delete the evidence.
+One artifact is worth naming: 14.29% of human posts have no title, against 0% of AI posts, so the `标题：` line is itself faint evidence of a machine author. It cannot inflate AI recall, since every AI post has a title, but it hands the models a slice of easy human posts.
 
 ---
 
-## Repository layout
-
-```text
-.
-├── configs/                  # All hyperparameters, no magic numbers in code
-│   ├── data.yaml             #   seed, split ratios, cleaning policy
-│   └── models.yaml           #   tfidf_logreg + transformer_roberta configs
-├── scripts/                  # CLI entry points (thin argparse wrappers)
-│   ├── audit_data.py         #   raw-data audit, no side effects on splits
-│   ├── prepare_data.py       #   clean → dedupe → stratified split
-│   ├── train.py              #   train a registered model
-│   ├── evaluate.py           #   score a saved model on the test split
-│   ├── check_device.py       #   MPS/CUDA/CPU diagnostics
-│   └── run_smoke_test.sh     #   end-to-end tiny-sample pipeline check
-├── src/rednote_aigt/         # Installable package (src layout)
-│   ├── data/                 #   load, clean, audit, split, prepare
-│   ├── models/               #   tfidf, transformer, registry, io
-│   ├── training/             #   training loop + training-curve plots
-│   ├── evaluation/           #   metrics, subgroup analysis, plots
-│   └── utils/                #   device selection, io, logging, progress
-├── tests/                    # pytest unit + smoke tests
-├── outputs/
-│   ├── reports/              # Committed evidence: metrics, subgroups, errors
-│   └── figures/              # Committed diagnostic plots
-├── docs/
-│   ├── report.pdf            # Full write-up (method, results, limitations)
-│   └── model_choice.md       # Why these two models and these metrics
-├── data/                     # Gitignored — download RedNote-Vibe locally
-└── models/                   # Gitignored — regenerate with scripts/train.py
-```
-
-Models are resolved through a name → class registry
-([src/rednote_aigt/models/registry.py](src/rednote_aigt/models/registry.py)), so
-`--model tfidf_logreg` and `--model transformer_roberta` run through the same
-training and evaluation path. Evaluation is shared, which is what makes the
-results table an apples-to-apples comparison rather than two separate runs.
-
-Large artifacts are not committed. Raw data, processed splits, trained weights,
-and full prediction dumps are all gitignored; `outputs/` keeps the metrics,
-subgroup tables, error samples, and figures that back the numbers above.
-
----
-
-## Setup
+## Reproduce
 
 ```bash
-python3 -m venv .venv
-source .venv/bin/activate
+python3 -m venv .venv && source .venv/bin/activate
 pip install -e ".[dev]"
+python3 -m pytest
 ```
 
-Requires Python ≥ 3.10. Runs on CUDA, Apple Silicon MPS, or CPU — the device
-selector picks automatically:
+Download `training_set_human.jsonl` and `training_set_aigc.jsonl` from [RedNote-Vibe](https://github.com/ydli-ai/RedNote-Vibe) into `data/raw/`, then:
 
 ```bash
-python3 scripts/check_device.py
-```
-
----
-
-## Reproducing the results
-
-### 1. Get the data
-
-Download the supervised training files from
-[RedNote-Vibe](https://github.com/ydli-ai/RedNote-Vibe/tree/main) into
-`data/raw/`:
-
-```text
-data/raw/training_set_human.jsonl
-data/raw/training_set_aigc.jsonl
-```
-
-`exploration_set.jsonl` is unlabeled post-LLM analysis data and is not used for
-supervised training or metrics.
-
-Verify you have the same files used here:
-
-```bash
-shasum -a 256 data/raw/training_set_human.jsonl data/raw/training_set_aigc.jsonl
-```
-
-```text
-c737fe5d8b40dc21a3c61657e42e5359942a6abdf6837f31ad1dcef696eb1054  data/raw/training_set_human.jsonl
-288d6ec75512301dd5accaa22205204ce626d13b61753bc3e7ff005061108659  data/raw/training_set_aigc.jsonl
-```
-
-### 2. Audit and prepare the splits
-
-```bash
-python3 scripts/audit_data.py   --config configs/data.yaml
 python3 scripts/prepare_data.py --config configs/data.yaml --force
+python3 scripts/train.py    --model tfidf_logreg --force
+python3 scripts/evaluate.py --model-dir models/tfidf_logreg
+python3 scripts/holdout_generator.py --model tfidf_logreg
+python3 scripts/holdout_generator.py --model tfidf_logreg --mode control
 ```
 
-The audit writes `outputs/reports/data_audit.{json,md}` before any split exists,
-which is what surfaced the metadata-leakage risk and the title-presence skew in
-the first place.
-
-Preparation loads 51,878 human and 7,254 AI rows, removes 250 within-label exact
-duplicates, and produces a seed-42, 70/15/15, label+domain-stratified split:
-
-| Split | Rows | Human | AI |
-| --- | --- | --- | --- |
-| Train | 41,217 | 36,140 | 5,077 |
-| Validation | 8,832 | 7,741 | 1,091 |
-| Test | 8,833 | 7,747 | 1,086 |
-
-The splitter asserts that no exact duplicate text value crosses a split
-boundary, so the held-out numbers are not inflated by leakage.
-
-### 3. Train and evaluate
-
-TF-IDF baseline:
-
-```bash
-python3 scripts/train.py    --model tfidf_logreg --config configs/models.yaml --force
-python3 scripts/evaluate.py --model-dir models/tfidf_logreg --test-path data/processed/test.csv
-```
-
-Transformer:
-
-```bash
-python3 scripts/train.py    --model transformer_roberta --config configs/models.yaml --device auto --force
-python3 scripts/evaluate.py --model-dir models/transformer_roberta --test-path data/processed/test.csv --device auto
-```
-
-Both write metrics, subgroup tables, error CSVs, and plots to
-`outputs/reports/<model>/` and `outputs/figures/<model>/`.
-
-### 4. Quick check without the full corpus
-
-```bash
-bash scripts/run_smoke_test.sh
-```
-
-Trains and evaluates both models on a tiny sample to verify the pipeline end to
-end. Smoke-test metrics verify code paths only — they are not research results.
-
----
-
-## Model configurations
-
-| Model | Configuration |
-| --- | --- |
-| TF-IDF + LogReg | Character 2–5 grams, `min_df=2`, `max_df=0.95`, sublinear TF, 300k max features; class-weighted logistic regression, `liblinear`; 300,001 parameters |
-| chinese-roberta-wwm-ext | `hfl/chinese-roberta-wwm-ext`, 12 layers / hidden 768 / 12 heads; max length 256, effective batch 8, lr 2e-5, 1 epoch, weight decay 0.01, warmup 0.06; 102.3M parameters; best model selected on validation macro-F1 |
-
-Character n-grams are the right baseline for this corpus specifically because
-they need no word segmenter — jieba's behavior on slang, emoji-laden, and
-code-switched RedNote text is itself a confound. Full rationale for both model
-choices and the metric set is in [docs/model_choice.md](docs/model_choice.md).
+Use `--model transformer_roberta` for the encoder. Splits are seed 42, 70/15/15, stratified by label and domain. The splitter refuses to emit a split where any post's text lands on both sides of a boundary, and reports near-duplicates that differ only by punctuation or emoji. That is 4 rows in the whole corpus.
 
 ---
 
 ## Limitations
 
-Stated plainly, because they bound what the results table means:
+Everything here is one corpus, one language, one moment in time, and the honest next steps are narrow:
 
-- **In-distribution only.** Train, validation, and test all come from one dataset
-  construction process. The numbers are supervised in-distribution evidence, not
-  proof of robustness to new generators, new prompting styles, or future posts.
-- **No held-out-generator experiment.** Generator-family subgroup results are
-  computed over the same random split, so they diagnose difficulty — they do not
-  measure generalization to an unseen generator.
-- **No ablations.** Title-only vs. content-only input, word-segmented TF-IDF,
-  alternative checkpoints, and sequence-length sweeps were not run.
-- **No qualitative error analysis.** False positives and negatives are exported
-  (`outputs/reports/*/errors_*.csv`) but not manually coded, so it is not yet
-  established whether long-post false positives reflect genuine AI signal or a
-  proxy for polished writing style.
-- **Single threshold.** Everything is reported at 0.5. A deployed detector would
-  tune the threshold on validation against an explicit recall/precision target.
-
-The intended use is decision support with human review, not automated
-moderation. False positives here mean accusing a real person of being a bot.
+- **Run the generator holdout and its control on the transformer**, to find out whether contextual models transfer across generators or merely memorize them better. The baseline's ranking survived unfamiliar generators while its threshold did not; an encoder may not split the same way.
+- **Tune the threshold against a stated cost.** Every number is reported at 0.5. A deployed detector would pick its operating point from an explicit budget for false accusations, not from a default.
 
 ---
 
-## Report
+## Dataset
 
-The full write-up — method, experiments, subgroup analysis, and related work —
-is in [docs/report.pdf](docs/report.pdf).
+[RedNote-Vibe](https://github.com/ydli-ai/RedNote-Vibe) — _A Dataset for Capturing Temporal Dynamics of AI-Generated Text in Social Media_ ([arXiv:2509.22055](https://arxiv.org/abs/2509.22055)).
 
-Authors: Xin Qian, Xubin Cai, David Edvin Welzien.
+## Authors
+
+- [David Welzien](https://github.com/Apolloden)
+- [Xin Qian](https://github.com/icymeow)
+- [Xubin Cai](https://github.com/xubin0)
