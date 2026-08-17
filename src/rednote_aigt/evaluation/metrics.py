@@ -89,6 +89,22 @@ def classification_report_dict(y_true: list[int] | np.ndarray, pred_label: list[
     )
 
 
+def wilson_interval(successes: int, trials: int, z: float = 1.96) -> tuple[float, float]:
+    """Wilson score interval for a proportion (default 95%).
+
+    Preferred over the normal approximation because the proportions here are
+    near 1.0 on small slices — a single generator family can have ~100 test
+    rows, where the textbook interval runs past 1 and understates uncertainty.
+    """
+    if trials <= 0:
+        return (0.0, 0.0)
+    proportion = successes / trials
+    denominator = 1 + z**2 / trials
+    center = (proportion + z**2 / (2 * trials)) / denominator
+    margin = z * np.sqrt(proportion * (1 - proportion) / trials + z**2 / (4 * trials**2)) / denominator
+    return (float(max(0.0, center - margin)), float(min(1.0, center + margin)))
+
+
 def subgroup_metrics(
     df: pd.DataFrame,
     group_column: str,

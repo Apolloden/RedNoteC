@@ -126,6 +126,41 @@ def plot_subgroup_domain_macro_f1(domain_metrics: pd.DataFrame, path: Path) -> N
     plt.close(fig)
 
 
+def plot_generator_holdout_recall(summary: pd.DataFrame, path: Path) -> None:
+    """Per family: AI recall with the generator seen, size-matched, and held out.
+
+    The middle bar is the control that keeps the family but trains on the same
+    reduced number of AI rows, so the gap it leaves is the part of the drop that
+    data volume cannot explain.
+    """
+    if summary.empty or "recall_ai_holdout" not in summary:
+        return
+    ensure_dir(path.parent)
+    data = summary.sort_values("recall_ai_holdout", ascending=False)
+    families = data["held_out_family"].astype(str).tolist()
+    positions = range(len(families))
+    series = []
+    if "recall_ai_in_distribution" in data:
+        series.append(("generator seen in training", data["recall_ai_in_distribution"], "#4C72B0"))
+    if "recall_ai_control" in data:
+        series.append(("size-matched control", data["recall_ai_control"], "#8C8C8C"))
+    series.append(("generator held out", data["recall_ai_holdout"], "#C44E52"))
+
+    width = 0.8 / len(series)
+    offsets = [(index - (len(series) - 1) / 2) * width for index in range(len(series))]
+    fig, ax = plt.subplots(figsize=(max(6.5, len(families) * 1.5), 4.5))
+    for (label, values, color), offset in zip(series, offsets):
+        ax.bar([i + offset for i in positions], values, width, label=label, color=color)
+    ax.set_xticks(list(positions), families)
+    ax.set_ylim(0, 1)
+    ax.set_ylabel("AI recall")
+    ax.set_title("Detecting a generator that was never trained on")
+    ax.legend(loc="lower right", fontsize=8)
+    fig.tight_layout()
+    fig.savefig(path, dpi=160)
+    plt.close(fig)
+
+
 def plot_length_bucket_ai_recall(length_metrics: pd.DataFrame, path: Path) -> None:
     if length_metrics.empty or "length_bucket" not in length_metrics or "recall_ai" not in length_metrics:
         return

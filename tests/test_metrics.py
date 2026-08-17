@@ -1,6 +1,7 @@
 import pandas as pd
+import pytest
 
-from rednote_aigt.evaluation.metrics import compute_binary_metrics, subgroup_metrics
+from rednote_aigt.evaluation.metrics import compute_binary_metrics, subgroup_metrics, wilson_interval
 
 
 def test_compute_binary_metrics_fixed_example():
@@ -53,3 +54,27 @@ def test_subgroup_metrics_scores_each_group_independently():
     assert result.loc["美食", "recall_ai"] == 1.0
     assert result.loc["学习", "recall_ai"] == 0.0
     assert list(result["rows"]) == [2, 2]
+
+
+def test_wilson_interval_matches_the_closed_form():
+    # Worked example: 10 successes in 100 trials -> (0.0552, 0.1744).
+    low, high = wilson_interval(10, 100)
+    assert low == pytest.approx(0.05523, abs=1e-4)
+    assert high == pytest.approx(0.17437, abs=1e-4)
+
+
+def test_wilson_interval_stays_inside_zero_one_at_the_boundary():
+    """The normal approximation collapses to (1.0, 1.0) here; Wilson must not."""
+    low, high = wilson_interval(105, 105)
+    assert high == pytest.approx(1.0)
+    assert 0.96 < low < 1.0
+
+
+def test_wilson_interval_widens_on_smaller_samples():
+    narrow = wilson_interval(900, 1000)
+    wide = wilson_interval(90, 100)
+    assert (wide[1] - wide[0]) > (narrow[1] - narrow[0])
+
+
+def test_wilson_interval_handles_empty_input():
+    assert wilson_interval(0, 0) == (0.0, 0.0)
